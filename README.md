@@ -11,7 +11,8 @@ Professional inventory management system integrated with Odoo. It uses ABC/XYZ a
 - **.env**: Environment secrets and credentials.
 
 ## 🚀 Quick Start
-1. Configure your `.env` file with Odoo and Database credentials.
+1. Copy `.env.example` to `.env` and configure it with your Odoo and Database credentials:
+   `cp .env.example .env`
 2. Run `docker-compose up -d --build`.
 3. Open `http://localhost` to access the dashboard.
 
