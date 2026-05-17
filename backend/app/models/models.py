@@ -78,17 +78,6 @@ class Product(SQLModel, table=True):
     image_url: Optional[str] = None
     description: Optional[str] = None
 
-    # Forecasting analysis fields
-    forecast_model: Optional[str] = None
-    forecast_mape: float = 0.0
-    demand_pattern: str = "Stable"
-    trend_type: str = "Stable"
-    seasonality_strength: float = 0.0
-    volatility_index: float = 0.0
-
-    # Relationships
-    forecast_results: List["ForecastResult"] = Relationship(back_populates="product")
-    forecast_metrics: Optional["ForecastMetric"] = Relationship(back_populates="product")
 
 
 class StockQuant(SQLModel, table=True):
@@ -142,41 +131,6 @@ class SalesHistory(SQLModel, table=True):
     product: Product = Relationship(back_populates="sales_history")
 
 
-class ForecastResult(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    product_id: int = Field(foreign_key="product.odoo_id")
-    date: datetime
-    quantity: float # Predicted value
-    is_real: bool = False # False for future, True for backtesting
-    
-    # Traceability
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    version: int = 1
-    
-    product: Product = Relationship(back_populates="forecast_results")
-
-
-class ForecastMetric(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    product_id: int = Field(foreign_key="product.odoo_id", unique=True)
-    
-    mae: float = 0.0
-    mape: float = 0.0
-    rmse: float = 0.0
-    bias: float = 0.0
-    wmape: float = 0.0
-    
-    mean: float = 0.0
-    median: float = 0.0
-    std_dev: float = 0.0
-    p25: float = 0.0
-    p75: float = 0.0
-    outliers_count: int = 0
-    
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    product: Product = Relationship(back_populates="forecast_metrics")
-
 
 class Partner(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -216,50 +170,4 @@ class BOM(SQLModel, table=True):
     child: "Product" = Relationship(back_populates="bom_children", sa_relationship_kwargs={"foreign_keys": "[BOM.child_id]"})
 
 
-class ResourceCapacity(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(unique=True)
-    capacity_per_day: float = 8.0  # Hours, Units, etc.
-    cost_per_unit: float = 0.0
-    
-    # Advanced MPS / Labor fields
-    cost_worker_month: float = 2000.0
-    cost_hiring: float = 1000.0
-    cost_firing: float = 1500.0
-    units_per_worker_month: float = 500.0
-    initial_workers: int = 10
 
-
-class ProductionPlan(SQLModel, table=True):
-    """Stores Master Production Schedule (MPS) results."""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    product_id: int = Field(index=True)
-    period_start: datetime
-    planned_qty: float
-    projected_inventory: float
-    cost_production: float = 0.0
-    cost_holding: float = 0.0
-    
-    # Advanced MPS / Labor results
-    planned_workers: float = 0.0
-    hiring_qty: float = 0.0
-    firing_qty: float = 0.0
-    cost_labor: float = 0.0
-    cost_hiring: float = 0.0
-    cost_firing: float = 0.0
-
-
-class MRPRequirement(SQLModel, table=True):
-    """Stores Material Requirements Planning (MRP) explosion results."""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    product_id: int = Field(index=True)
-    date: datetime
-    gross_requirement: float
-    scheduled_receipt: float = 0.0
-    projected_available: float
-    net_requirement: float
-    planned_order_release: float
-    
-    # Traceability
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    version: int = 1

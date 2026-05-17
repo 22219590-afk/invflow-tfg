@@ -14,8 +14,7 @@ export default function ConfigModule({ token, devMode, setDevMode }: { token: st
   }, [token])
 
   const erpConfigs = configs.filter(c => c.key.startsWith('odoo_'))
-  const paramConfigs = configs.filter(c => ['service_level_a', 'service_level_b', 'service_level_c', 'abc_threshold_a', 'abc_threshold_b', 'lead_time_default_days', 'ordering_cost', 'holding_rate'].includes(c.key))
-  const mrpConfigs = configs.filter(c => ['review_period_b_days'].includes(c.key))
+  const paramConfigs = configs.filter(c => ['service_level_a', 'service_level_b', 'service_level_c', 'abc_threshold_a', 'abc_threshold_b', 'lead_time_default_days', 'ordering_cost', 'holding_rate', 'review_period_b_days'].includes(c.key))
 
   const handleUpdate = (key: string, value: string) => {
     setConfigs(prev => prev.map(c => c.key === key ? { ...c, value } : c))
@@ -81,8 +80,6 @@ export default function ConfigModule({ token, devMode, setDevMode }: { token: st
       <div className="tabs-header">
         <button className={`tab-btn ${activeTab === 'erp' ? 'active' : ''}`} onClick={() => setActiveTab('erp')}>1. Conexión ERP</button>
         <button className={`tab-btn ${activeTab === 'params' ? 'active' : ''}`} onClick={() => setActiveTab('params')}>2. Parámetros Estándar</button>
-        <button className={`tab-btn ${activeTab === 'mrp' ? 'active' : ''}`} onClick={() => setActiveTab('mrp')}>3. Reglas MRP</button>
-        <button className={`tab-btn ${activeTab === 'forecast' ? 'active' : ''}`} onClick={() => setActiveTab('forecast')}>4. Forecasting</button>
       </div>
 
       {status.text && (
@@ -110,20 +107,6 @@ export default function ConfigModule({ token, devMode, setDevMode }: { token: st
       )}
       
       {activeTab === 'params' && renderConfigTable(paramConfigs)}
-      {activeTab === 'mrp' && renderConfigTable(mrpConfigs)}
-      
-      {activeTab === 'forecast' && (
-        <div className="animate-in" style={{ padding: 40, background: 'white', borderRadius: 16, border: '1px solid #e2e8f0', textAlign: 'center' }}>
-          <TrendingUp size={48} style={{ color: '#3b82f6', marginBottom: 16 }} />
-          <h3>Modelos de Forecasting</h3>
-          <p style={{ color: '#64748b', maxWidth: 500, margin: '12px auto' }}>Selección automática entre Holt-Winters y ARIMA basada en el menor error (MAPE).</p>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginTop: 24 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked readOnly /> Holt-Winters</label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked readOnly /> ARIMA</label>
-          </div>
-          <button className="btn btn-primary" style={{ marginTop: 32 }}>Activar Auto-selección</button>
-        </div>
-      )}
 
       <div style={{ marginTop: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 24 }}>
         <div />

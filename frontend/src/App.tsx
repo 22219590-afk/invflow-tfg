@@ -5,8 +5,6 @@ import DashboardModule from './modules/dashboard/DashboardModule'
 import InventoryModule from './modules/plan_diario/InventoryModule'
 import SimulationModule from './modules/simulacion/SimulationModule'
 import ConfigModule from './modules/configuracion/ConfigModule'
-import MPSModule from './modules/mps/MPSModule'
-import ForecastModule from './modules/forecast/ForecastModule'
 import UsersModule from './modules/usuarios/UsersModule'
 import { apiFetch } from './modules/core/api'
 
@@ -63,13 +61,9 @@ export default function App() {
   const renderView = () => {
     switch (view) {
       case 'dashboard':
-        return <DashboardModule token={token} devMode={devMode} setView={setView} />
+        return <DashboardModule token={token} setView={setView} />
       case 'plan_diario':
         return <InventoryModule token={token} onSync={handleSync} syncing={syncing} />
-      case 'mps':
-        return <MPSModule token={token} />
-      case 'forecast':
-        return <ForecastModule token={token} />
       case 'simulation':
         return <SimulationModule token={token} />
       case 'users':
@@ -77,7 +71,7 @@ export default function App() {
       case 'settings':
         return <ConfigModule token={token} devMode={devMode} setDevMode={setDevMode} />
       default:
-        return <DashboardModule token={token} devMode={devMode} setView={setView} />
+        return <DashboardModule token={token} setView={setView} />
     }
   }
 

@@ -44,14 +44,7 @@ export default function ProductDetailModal({ product, token, onClose, onSave }: 
   const [saving, setSaving] = useState(false)
   const [saveState, setSaveState] = useState<'idle' | 'ok' | 'err'>('idle')
   const [calcProduct, setCalcProduct] = useState<any>(product)
-  const [forecast, setForecast] = useState<any>(null)
-  const [loadingFc, setLoadingFc] = useState(true)
-
-  useEffect(() => {
-    apiFetch(`/products/${product.id}/forecast`, token)
-      .then(d => { setForecast(d); setLoadingFc(false) })
-      .catch(() => setLoadingFc(false))
-  }, [product.id, token])
+  // Forecast state and fetch removed for modular refactoring
 
   async function handleSave() {
     setSaving(true)
@@ -99,15 +92,7 @@ export default function ProductDetailModal({ product, token, onClose, onSave }: 
 
   const calcFields = CALC_FIELDS[policy] || CALC_FIELDS.C
 
-  // Forecast weekly (now directly from our weekly forecasting engine)
-  const forecastWeeks: { week: string; val: string }[] = forecast?.forecast_final
-    ? forecast.forecast_final.slice(0, 6).map((v: number, i: number) => ({
-        week: `S${i + 1}`,
-        val: Number(v).toFixed(1),
-      }))
-    : []
-
-  // Daily demand: read-only, comes from forecast/sync
+  // Daily demand: read-only, comes from Odoo sync
   const dailyDemand = sf('daily_demand') || sf('manual_daily_demand')
 
   return (
@@ -142,7 +127,7 @@ export default function ProductDetailModal({ product, token, onClose, onSave }: 
             <div>
               <div style={{ fontSize: '0.63rem', fontWeight: 700, color: '#1e40af', textTransform: 'uppercase' }}>Demanda media / día</div>
               <div style={{ fontWeight: 800, fontSize: '1rem', color: '#1e3a8a' }}>{dailyDemand.toFixed(2)} uds</div>
-              <div style={{ fontSize: '0.6rem', color: '#3b82f6', marginTop: 2 }}>Calculado desde forecast automático</div>
+              <div style={{ fontSize: '0.6rem', color: '#3b82f6', marginTop: 2 }}>Calculado desde histórico de ventas Odoo</div>
             </div>
             <div>
               <div style={{ fontSize: '0.63rem', fontWeight: 700, color: '#1e40af', textTransform: 'uppercase' }}>Stock actual</div>
@@ -272,35 +257,6 @@ export default function ProductDetailModal({ product, token, onClose, onSave }: 
             </div>
           )}
 
-          {/* Forecast */}
-          <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Forecast Demanda Semanal
-              {forecast?.best_model && (
-                <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: 8, fontSize: '0.68rem', textTransform: 'none' }}>
-                  modelo: {forecast.best_model}
-                </span>
-              )}
-            </div>
-            {loadingFc ? (
-              <div style={{ textAlign: 'center', padding: 16 }}><RefreshCw className="rotate-slow" size={18} color="#94a3b8" /></div>
-            ) : forecastWeeks.length > 0 ? (
-              <div style={{ display: 'flex', gap: 6 }}>
-                {forecastWeeks.map(f => (
-                  <div key={f.week} style={{ flex: 1, background: '#eff6ff', borderRadius: 8, padding: '8px 4px', textAlign: 'center', border: '1px solid #bfdbfe' }}>
-                    <div style={{ fontSize: '0.6rem', color: 'var(--primary)', fontWeight: 700 }}>{f.week}</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1e40af', marginTop: 2 }}>{f.val}</div>
-                    <div style={{ fontSize: '0.55rem', color: '#64748b' }}>uds</div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '10px 0', color: '#94a3b8', fontSize: '0.78rem' }}>
-                <AlertCircle size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                Sin histórico suficiente para calcular forecast
-              </div>
-            )}
-          </div>
 
           {/* Save */}
           {saveState === 'err' && (

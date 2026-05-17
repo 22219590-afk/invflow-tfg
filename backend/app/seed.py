@@ -1,10 +1,9 @@
 from sqlmodel import Session, create_engine, select
-from app.models.models import Product, StockQuant, StockMove, Partner, BOM, ProductionPlan
+from app.models.models import Product, StockQuant, StockMove, Partner, BOM
 from datetime import datetime, timedelta
 import random
 import os
 import numpy as np
-
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://admin:admin@db/inventory_db")
 engine = create_engine(DATABASE_URL)
 
@@ -116,38 +115,7 @@ def seed():
         session.commit()
         print("Mock data seeded successfully.")
 
-        # Seed historical production plans (planned values) for past months of current year
-        current_year = datetime.now().year
-        for m in range(1, datetime.now().month):
-            dt = datetime(current_year, m, 1)
-            p_val = 4000 + random.uniform(-500, 500)
-            plan = ProductionPlan(
-                product_id=0,
-                period_start=dt,
-                planned_qty=round(p_val, 2),
-                projected_inventory=1000 + random.uniform(-200, 200),
-                planned_workers=20,
-                cost_production=p_val * 10,
-                cost_labor=20 * 2500
-            )
-            session.add(plan)
-            
-            # Also seed REAL production moves for these months
-            # Move from Production (7) to Stock (8)
-            real_p = p_val * random.uniform(0.85, 1.15) # 15% deviation
-            move = StockMove(
-                odoo_id=40000 + m,
-                product_id=1001, # Just assign to one for aggregate
-                date=dt + timedelta(days=15),
-                product_uom_qty=round(real_p, 2),
-                state="done",
-                location_id=7, # Production
-                location_dest_id=8 # Stock
-            )
-            session.add(move)
 
-        session.commit()
-        print("Historical plans and production seeded.")
 
         # Seed BOMs for MRP demonstration
         print("Seeding BOM structures...")

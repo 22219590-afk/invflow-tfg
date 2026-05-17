@@ -65,20 +65,6 @@ export default function MainLayout({
               collapsed={collapsed}
             />
             <NavItem 
-              label="Previsión" 
-              icon={<TrendingUp size={20} />} 
-              active={activeView === 'forecast'} 
-              onClick={() => setView('forecast')} 
-              collapsed={collapsed}
-            />
-            <NavItem 
-              label="Plan Maestro MPS" 
-              icon={<BarChart3 size={20} />} 
-              active={activeView === 'mps'} 
-              onClick={() => setView('mps')} 
-              collapsed={collapsed}
-            />
-            <NavItem 
               label="Simulación" 
               icon={<Zap size={20} />} 
               active={activeView === 'simulation'} 

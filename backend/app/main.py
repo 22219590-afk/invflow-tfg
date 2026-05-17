@@ -10,9 +10,8 @@ import os
 from app.core.config import settings
 from app.models.models import (
     Product, StockQuant, StockMove, SaleOrderLine, Partner, AppConfig, User, WidgetQuery,
-    BOM, ResourceCapacity, ProductionPlan, MRPRequirement
+    BOM
 )
-from app.services.production import ProductionService
 from app.core.auth import (
     verify_password, get_password_hash, create_access_token,
     get_current_user, require_role
@@ -20,9 +19,6 @@ from app.core.auth import (
 
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.configuracion.router import router as config_router
-from app.modules.mps.router import router as mps_router
-# MRP module deactivated — routes removed, backend files preserved for future use
-from app.modules.forecast.router import router as forecast_router
 from app.modules.usuarios.service import UserService
 
 app = FastAPI(
@@ -35,8 +31,6 @@ app = FastAPI(
 
 app.include_router(dashboard_router, prefix="/v1")
 app.include_router(config_router, prefix="/v1")
-app.include_router(mps_router, prefix="/v1")
-app.include_router(forecast_router)  # Forecast module — isolated, no prefix needed (router has /v1/forecast)
 
 app.add_middleware(
     CORSMiddleware,
@@ -85,33 +79,6 @@ def _ensure_schema_updates():
             # User table migrations
             session.exec(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE'))
             session.exec(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS role VARCHAR DEFAULT \'viewer\''))
-            
-            # ForecastMetric table migrations
-            session.exec(text('ALTER TABLE forecastmetric ADD COLUMN IF NOT EXISTS bias FLOAT DEFAULT 0.0'))
-            session.exec(text('ALTER TABLE forecastmetric ADD COLUMN IF NOT EXISTS wmape FLOAT DEFAULT 0.0'))
-            session.exec(text('ALTER TABLE forecastmetric ADD COLUMN IF NOT EXISTS mean FLOAT DEFAULT 0.0'))
-            session.exec(text('ALTER TABLE forecastmetric ADD COLUMN IF NOT EXISTS median FLOAT DEFAULT 0.0'))
-            session.exec(text('ALTER TABLE forecastmetric ADD COLUMN IF NOT EXISTS std_dev FLOAT DEFAULT 0.0'))
-            session.exec(text('ALTER TABLE forecastmetric ADD COLUMN IF NOT EXISTS p25 FLOAT DEFAULT 0.0'))
-            session.exec(text('ALTER TABLE forecastmetric ADD COLUMN IF NOT EXISTS p75 FLOAT DEFAULT 0.0'))
-            session.exec(text('ALTER TABLE forecastmetric ADD COLUMN IF NOT EXISTS outliers_count INTEGER DEFAULT 0'))
-            
-            # ForecastResult table migrations
-            session.exec(text('ALTER TABLE forecastresult ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
-            session.exec(text('ALTER TABLE forecastresult ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1'))
-            
-            # MRPRequirement table migrations
-            session.exec(text('ALTER TABLE mrprequirement ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
-            session.exec(text('ALTER TABLE mrprequirement ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1'))
-            
-            # ProductionPlan table migrations (just in case they are added later)
-            session.exec(text('ALTER TABLE productionplan ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
-            session.exec(text('ALTER TABLE productionplan ADD COLUMN IF NOT EXISTS version INTEGER DEFAULT 1'))
-
-            # MPSMonthDetail — new fields added in MPS rewrite
-            session.exec(text('ALTER TABLE mpsmonthdetail ADD COLUMN IF NOT EXISTS capacity_utilization FLOAT DEFAULT 0.0'))
-            session.exec(text('ALTER TABLE mpsmonthdetail ADD COLUMN IF NOT EXISTS shortfall FLOAT DEFAULT 0.0'))
-
             session.commit()
         except Exception as e:
             print(f"Migration warning: {e}")
@@ -412,33 +379,6 @@ def update_product_policy(
     return service.get_products_enriched_single(product_id)
 
 
-@app.get("/v1/products/{product_id}/forecast", tags=["Inventory"])
-def get_product_forecast(
-    product_id: int,
-    session: Session = Depends(get_session),
-    _: User = Depends(get_current_user),
-):
-    from app.modules.forecast.services import ForecastEngine
-    engine = ForecastEngine(session)
-    # Note: frontend sends internal product.id here, we need to map to odoo_id if needed
-    # but engine.get_product_forecast_data takes odoo_id usually. 
-    # Let's find the odoo_id first.
-    product = session.get(Product, product_id)
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    data = engine.get_product_forecast_data(product.odoo_id)
-    if not data:
-        return {"error": "Forecast not found"}
-        
-    # Bridge to legacy format expected by ProductDetailModal.tsx
-    return {
-        "best_model": data.get("forecast_model"),
-        "forecast_final": [r["quantity"] for r in data.get("forecast_results", [])],
-        "mape": data.get("forecast_mape"),
-        "chart_data": data.get("chart_data")
-    }
-
 
 # ─── COMPONENTS (BOM EXPLOSION — READ ONLY) ───────────────────────────────────
 
@@ -669,11 +609,7 @@ def sync_data(
         }
 
         # Clear old data to ensure a fresh start
-        session.exec(text("DELETE FROM forecastresult"))
-        session.exec(text("DELETE FROM forecastmetric"))
         session.exec(text("DELETE FROM saleshistory"))
-        session.exec(text("DELETE FROM productionplan"))
-        session.exec(text("DELETE FROM mrprequirement"))
         session.exec(text("DELETE FROM bom"))
         session.exec(text("DELETE FROM stockquant"))
         session.exec(text("DELETE FROM stockmove"))
@@ -841,15 +777,11 @@ def sync_data(
         #    from app.services.demand_simulator import DemandSimulator
         #    DemandSimulator(session).generate_synthetic_history()
 
-        # UNIFIED CORE: Run Forecasting Engine first (new isolated engine)
-        from app.modules.forecast.services import ForecastEngine
-        ForecastEngine(session).run_all_products()
-
-        # Then run Analytics (ABC depends on the daily_demand updated by Forecast)
+        # Then run Analytics (ABC classification and policy calculation)
         from app.services.analytics import AnalyticsService
         AnalyticsService(session).calculate_abc_xyz()
 
-        return {"message": "Sync complete and forecasting unified", "products": len(odoo_products)}
+        return {"message": "Sync complete and ABC/XYZ classification recalculated", "products": len(odoo_products)}
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Odoo sync failed: {str(e)}")
 
@@ -1057,76 +989,7 @@ def get_suppliers(session: Session = Depends(get_session), _: User = Depends(get
     return [{"odoo_id": p.odoo_id, "name": p.name, "lead_time_days": p.lead_time_days, "moq": p.moq} for p in partners]
 
 
-# ─── PRODUCTION MODULE (MPS / MRP) ─────────────────────────────────────────────
-
-class MPSRequest(BaseModel):
-    periods: int = 12
-    manual_demand: List[float] = None
-
-@app.post("/production/mps/general", tags=["Production"])
-def calculate_general_mps(
-    req: MPSRequest,
-    session: Session = Depends(get_session),
-    _: User = Depends(get_current_user)
-):
-    service = ProductionService(session)
-    return service.calculate_aggregate_mps(req.periods)
-
-@app.post("/production/mps/{product_id}", tags=["Production"])
-def calculate_mps(
-    product_id: int, 
-    req: MPSRequest,
-    session: Session = Depends(get_session), 
-    _: User = Depends(get_current_user)
-):
-    service = ProductionService(session)
-    return service.calculate_mps(product_id, req.periods, req.manual_demand)
-
-@app.get("/production/mrp/{parent_id}", tags=["Production"])
-def get_mrp_explosion(
-    parent_id: int,
-    session: Session = Depends(get_session),
-    _: User = Depends(get_current_user)
-):
-    service = ProductionService(session)
-    return service.calculate_mrp(parent_id)
-
-@app.get("/production/boms", tags=["Production"])
-def get_boms(session: Session = Depends(get_session), _: User = Depends(get_current_user)):
-    return session.exec(select(BOM)).all()
-
-@app.post("/production/boms", tags=["Production"])
-def create_bom(
-    parent_id: int, 
-    child_id: int, 
-    quantity: float,
-    session: Session = Depends(get_session),
-    _: User = Depends(require_role("admin", "planner"))
-):
-    service = ProductionService(session)
-    return service.create_bom(parent_id, child_id, quantity)
-
-@app.get("/production/resources", tags=["Production"])
-def get_resources(session: Session = Depends(get_session), _: User = Depends(get_current_user)):
-    return session.exec(select(ResourceCapacity)).all()
-
-@app.put("/production/resources/{res_id}", tags=["Production"])
-def update_resource(
-    res_id: int,
-    data: dict,
-    session: Session = Depends(get_session),
-    _: User = Depends(require_role("admin", "planner"))
-):
-    res = session.get(ResourceCapacity, res_id)
-    if not res: raise HTTPException(404)
-    for k, v in data.items():
-        if hasattr(res, k):
-            setattr(res, k, v)
-    session.add(res)
-    session.commit()
-    session.refresh(res)
-    return res
-
+# ─── SYSTEM SEED ──────────────────────────────────────────────────────────────
 
 @app.post("/system/seed", tags=["System"])
 def seed_sample_data(session: Session = Depends(get_session), _: User = Depends(require_role("admin"))):
@@ -1148,21 +1011,8 @@ def seed_sample_data(session: Session = Depends(get_session), _: User = Depends(
     bom2 = BOM(parent_id=1001, child_id=3001, quantity=2.0)
     session.add_all([bom1, bom2])
     
-    # 4. Create Capacity
-    res = ResourceCapacity(
-        name="Línea de Ensamblado A", 
-        capacity_per_day=10.0, 
-        cost_per_unit=15.0,
-        cost_worker_month=2200.0,
-        cost_hiring=1200.0,
-        cost_firing=1800.0,
-        units_per_worker_month=250.0,
-        initial_workers=8
-    )
-    session.add(res)
-    
     session.commit()
-    return {"message": "Sample data seeded successfully. Explore MPS and MRP."}
+    return {"message": "Sample data seeded successfully. Explore Daily Plan."}
 
 
 # ─── HEALTH ───────────────────────────────────────────────────────────────────
