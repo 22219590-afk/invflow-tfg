@@ -229,8 +229,7 @@ class AnalyticsService:
         
         # Rango: últimos 365 días
         now = datetime.now()
-        one_year_ago = now - timedelta(days=365)
-        cutoff = max(datetime(2025, 1, 1), one_year_ago)
+        cutoff = now - timedelta(days=365)
         
         sales = self.session.exec(
             select(SaleOrderLine)
@@ -313,8 +312,8 @@ class AnalyticsService:
         products = self.session.exec(select(Product)).all()
         if not products: return
 
-        # Filtro Temporal: Año actual (2026) y Año anterior (2025)
-        cutoff_date = datetime(2025, 1, 1)
+        # Últimos 2 años de datos para clasificación ABC
+        cutoff_date = datetime.now() - timedelta(days=730)
         
         # 1. Obtener líneas de venta reales (Solo confirmadas/hechas)
         from app.models.models import SaleOrderLine
