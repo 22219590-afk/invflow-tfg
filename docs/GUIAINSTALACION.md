@@ -226,7 +226,7 @@ docker compose logs frontend --tail=20   # Logs del frontend
 
 ## 🔒 PASO 9 — HTTPS con Certificado SSL (Recomendado para Producción)
 
-Si la empresa tiene un dominio propio, es muy recomendable activar HTTPS para cifrar las comunicaciones. Instala Certbot:
+Instala Certbot:
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx

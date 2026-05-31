@@ -25,7 +25,8 @@ app = FastAPI(
     title="InvFlow — Inventory Optimization API",
     description="Inventory planning DSS integrated with Odoo ERP",
     version="2.0.0",
-    docs_url="/docs",
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
     redirect_slashes=False,
 )
 
@@ -34,8 +35,8 @@ app.include_router(config_router, prefix="/v1")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False, # Must be False if origins is ["*"]
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
