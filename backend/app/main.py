@@ -610,6 +610,9 @@ def sync_data(
         }
 
         # Clear old data to ensure a fresh start
+        # Order matters: delete child tables before parent (product)
+        session.exec(text("DELETE FROM forecastresult"))
+        session.exec(text("DELETE FROM forecastmetric"))
         session.exec(text("DELETE FROM saleshistory"))
         session.exec(text("DELETE FROM bom"))
         session.exec(text("DELETE FROM stockquant"))
