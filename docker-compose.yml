@@ -58,7 +58,9 @@ services:
     command: celery -A app.worker worker --loglevel=info
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: development
     restart: always
     volumes:
       - ./frontend/src:/app/src
